@@ -1,0 +1,10 @@
+spring:
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
+
+elasticsearch:
+  host: localhost
+  port: 9200
+  scheme: http
