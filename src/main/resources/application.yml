@@ -8,3 +8,7 @@ elasticsearch:
   host: localhost
   port: 9200
   scheme: http
+
+logging:
+  level:
+    root: INFO
