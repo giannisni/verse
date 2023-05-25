@@ -1,5 +1,6 @@
 package com.getout.service;
 
+import com.getout.util.Constants;
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
@@ -24,7 +25,7 @@ public class KeywordFrequencyService {
     public static Map<LocalDate, Integer> getKeywordCounts(String keyword, LocalDate startDate, LocalDate endDate) throws IOException {
 
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("192.168.178.38", 9200, "http")));
+                RestClient.builder(new HttpHost(Constants.elastic_host, 9200, "http")));
 
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
                 .must(QueryBuilders.termQuery("keyword.keyword", keyword))

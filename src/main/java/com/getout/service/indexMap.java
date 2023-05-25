@@ -39,7 +39,7 @@ public class indexMap {
     public static void indexSortedMap(String indexName, Map<LocalDate, Integer> sortedMap,String keyword) throws IOException, InterruptedException, ExecutionException, ExecutionException {
         // Set up Elasticsearch client
         RestClient restClient = RestClient.builder(
-                new HttpHost("192.168.178.38", 9200)).build();
+                new HttpHost("localhost", 9200)).build();
 
         // Create the transport with a Jackson mapper
         ElasticsearchTransport transport = new RestClientTransport(
@@ -49,7 +49,7 @@ public class indexMap {
         ElasticsearchClient client = new ElasticsearchClient(transport);
 
         // Set up ExecutorService with an appropriate number of threads
-        int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), sortedMap.size());
+        int numThreads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), sortedMap.size()));
         ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 
         // Submit indexing tasks

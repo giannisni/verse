@@ -1,5 +1,6 @@
 package com.getout.verse;
 
+import com.getout.service.TweetMetricsService;
 import com.getout.service.WordFrequencyBatch;
 import com.getout.service.KeywordFrequencyService;
 
@@ -14,9 +15,24 @@ import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("/api/news")
+@CrossOrigin(origins = "http://localhost:3000")
 public class WordFrequencyController {
 
+    private final TweetMetricsService tweetMetricsService;
+
+    public WordFrequencyController(TweetMetricsService tweetMetricsService) {
+        this.tweetMetricsService = tweetMetricsService;
+    }
+
     @CrossOrigin(origins = "http://localhost:3000")
+
+
+
+    @PostMapping("/tweet-metrics")
+    public ResponseEntity<Void> calculateTweetMetrics(@RequestParam String startDate, @RequestParam String endDate) throws IOException {
+        tweetMetricsService.calculateTweetMetrics(startDate, endDate);
+        return ResponseEntity.ok().build();
+    }
 
 
     @GetMapping("/counts")
@@ -33,10 +49,10 @@ public class WordFrequencyController {
     }
     @GetMapping("/word-frequency")
     public ResponseEntity<Map<LocalDate, Integer>> getWordFrequency(@RequestParam String indexName,
-                                                                     @RequestParam String keyword,
+                                                                     @RequestParam String keyword,@RequestParam String startDate,@RequestParam String endDate,
                                                                      @RequestParam int batchSize){
         try {
-            Map<LocalDate, Integer> wordFrequency = WordFrequencyBatch.searchKeywordFrequency(indexName, keyword, batchSize);
+            Map<LocalDate, Integer> wordFrequency = WordFrequencyBatch.searchKeywordFrequency(indexName, keyword, batchSize,startDate,endDate);
             return ResponseEntity.ok(wordFrequency);
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -46,4 +62,6 @@ public class WordFrequencyController {
             throw new RuntimeException(e);
         }
     }
+
+
 }

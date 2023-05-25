@@ -55,17 +55,17 @@ public class WordFrequencyBatch {
     }};
     private static final Logger logger = Logger.getLogger(WordFrequencyBatch.class.getName());
 
-    public Map<LocalDate, Integer> searchKeywordFrequency(String indexName, String keyword, int batchSize, String startDate, String endDate) throws IOException, InterruptedException, ExecutionException {
+    public static Map<LocalDate, Integer> searchKeywordFrequency(String indexName, String keyword, int batchSize, String startDate, String endDate) throws IOException, InterruptedException, ExecutionException {
         // Start timer
         //long startTime = System.currentTimeMillis();
         long startTime3 = System.currentTimeMillis();
         AtomicInteger processedHits = new AtomicInteger(0);
-
+        System.out.println("Keyword: " + keyword);
         long startTime1 = System.currentTimeMillis();
 
         // Set up Elasticsearch client and query for keyword frequency data
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("192.168.178.38", 9200, "http")));
+                RestClient.builder(new HttpHost("localhost", 9200, "http")));
 
         DateTimeFormatter formatter = new DateTimeFormatterBuilder()
                 .appendPattern("yyyy-MM-dd'T'HH:mm:ss")

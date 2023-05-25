@@ -22,7 +22,7 @@ public class ScheduledTasks {
         this.wordFrequencyBatch = wordFrequencyBatch;
     }
 
-    @Scheduled(cron = "0 0 1 * * *") // runs every day at 3 AM
+    @Scheduled(cron = "0 0 0 * * *")
     public void scheduleKeywordCountTask() {
         logger.info("Starting scheduled task for keyword count...");
 
@@ -33,7 +33,10 @@ public class ScheduledTasks {
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
         LocalDateTime now = LocalDateTime.now();
         String endDate = now.format(formatter);
-        String startDate = now.minusDays(2).format(formatter);
+        String startDate = now.minusDays(15).format(formatter);
+
+        System.out.println("Start date: " + startDate);
+        System.out.println("End date: " + endDate);
 
         // Initialize an ExecutorService with a fixed number of threads
         int numberOfThreads = 4; // Adjust this value according to your system's capabilities
@@ -46,7 +49,7 @@ public class ScheduledTasks {
         for (String keyword : keywords) {
             Callable<Map<LocalDate, Integer>> task = () -> {
                 try {
-                    return wordFrequencyBatch.searchKeywordFrequency("daily_keyword_counts", keyword, 500, startDate, endDate);
+                    return wordFrequencyBatch.searchKeywordFrequency("norconex2", keyword, 500, startDate, endDate);
                 } catch (Exception e) {
                     logger.error("Error processing keyword: " + keyword, e);
                     return Collections.emptyMap();
