@@ -1,6 +1,5 @@
 package com.getout.service;
 
-
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.IndexRequest;
 import co.elastic.clients.elasticsearch.core.IndexResponse;
@@ -11,11 +10,7 @@ import co.elastic.clients.transport.rest_client.RestClientTransport;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import org.apache.http.HttpHost;
-import org.apache.http.nio.entity.NStringEntity;
-
 import org.elasticsearch.client.RestClient;
-import org.elasticsearch.xcontent.XContentBuilder;
-import org.elasticsearch.xcontent.XContentFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,49 +27,53 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 @Service
-public class indexMap {
-    // ...
+public class IndexMap {
 
+    /**
+     * Indexes a sorted map into Elasticsearch.
+     *
+     * @param indexName  The name of the Elasticsearch index.
+     * @param sortedMap  The map containing date to integer mappings.
+     * @param keyword    The keyword associated with the data.
+     * @throws IOException, InterruptedException, ExecutionException If there's an issue indexing the data.
+     */
     @Autowired
-    public static void indexSortedMap(String indexName, Map<LocalDate, Integer> sortedMap,String keyword) throws IOException, InterruptedException, ExecutionException, ExecutionException {
-        // Set up Elasticsearch client
-        RestClient restClient = RestClient.builder(
-                new HttpHost("localhost", 9200)).build();
+    public static void indexSortedMap(String indexName, Map<LocalDate, Integer> sortedMap, String keyword) throws IOException, InterruptedException, ExecutionException {
+        // Initialize Elasticsearch RestClient
+        RestClient restClient = RestClient.builder(new HttpHost("localhost", 9200)).build();
 
         // Create the transport with a Jackson mapper
-        ElasticsearchTransport transport = new RestClientTransport(
-                restClient, new JacksonJsonpMapper());
+        ElasticsearchTransport transport = new RestClientTransport(restClient, new JacksonJsonpMapper());
 
-        // And create the API client
+        // Initialize the Elasticsearch client
         ElasticsearchClient client = new ElasticsearchClient(transport);
 
-        // Set up ExecutorService with an appropriate number of threads
+        // Determine the number of threads based on available processors and map size
         int numThreads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), sortedMap.size()));
         ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 
-        // Submit indexing tasks
+        // List to hold futures of submitted tasks
         List<Future<Void>> futures = new ArrayList<>();
+
+        // Iterate over the sorted map and submit indexing tasks
         for (Map.Entry<LocalDate, Integer> entry : sortedMap.entrySet()) {
             futures.add(executorService.submit(() -> {
                 LocalDate date = entry.getKey();
                 Integer value = entry.getValue();
 
+                // Construct the JSON object for indexing
                 JsonObject jsonObject = Json.createObjectBuilder()
                         .add("date", date.toString())
                         .add("value", value)
                         .add("keyword", keyword)
                         .build();
 
-                Reader input = new StringReader(
-                        jsonObject.toString()
-                                .replace('\'', '"'));
+                Reader input = new StringReader(jsonObject.toString().replace('\'', '"'));
 
-                IndexRequest<JsonData> request = IndexRequest.of(i -> i
-                        .index(indexName)
-                        .withJson(input)
-                );
-
+                // Create and execute the index request
+                IndexRequest<JsonData> request = IndexRequest.of(i -> i.index(indexName).withJson(input));
                 IndexResponse response = client.index(request);
+
                 return null; // Return null as Void cannot be instantiated
             }));
         }
@@ -84,10 +83,8 @@ public class indexMap {
             future.get();
         }
 
-        // Shutdown the executor service
+        // Cleanup resources
         executorService.shutdown();
-
-        // Close the Elasticsearch client
         restClient.close();
     }
 }

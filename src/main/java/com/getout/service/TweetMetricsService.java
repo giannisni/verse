@@ -28,27 +28,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.getout.util.Constants.elastic_host;
 import static org.elasticsearch.xcontent.XContentFactory.jsonBuilder;
 
 @Service
 public class TweetMetricsService {
 
-//    private RestHighLevelClient client;
-//
-//    public TweetMetricsService() {
-//        this.client = new RestHighLevelClient(
-//                RestClient.builder(new HttpHost("localhost", 9200, "http")));
-//    }
 
+
+    /**
+     * Calculates metrics for tweets within a specified date range and stores the results in a new Elasticsearch index.
+     *
+     * @param startDate The start date of the range to analyze.
+     * @param endDate   The end date of the range to analyze.
+     * @throws IOException If there's an issue communicating with Elasticsearch.
+     */
     public void calculateTweetMetrics(String startDate, String endDate) throws IOException {
-
+        // Initialize Elasticsearch client
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
-        // Prepare the date range filter
+                RestClient.builder(new HttpHost(elastic_host, 9200, "http")));
+
+        // Build a query to filter tweets based on the provided date range
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
                 .filter(QueryBuilders.rangeQuery("data.created_at").gte(startDate).lte(endDate));
 
-        // Prepare the aggregations
+        // Define aggregations to group by date and then by tag, calculating the average sentiment score for each tag
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
                 .query(boolQuery)
                 .size(0)
@@ -59,39 +63,39 @@ public class TweetMetricsService {
                                 .subAggregation(AggregationBuilders.avg("avg_sentiment_score").field("sentiment_result.score")))
                 );
 
-        // Execute the query
+        // Execute the search request on the "twitter" index
         SearchRequest searchRequest = new SearchRequest("twitter");
         searchRequest.source(searchSourceBuilder);
-
         SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
 
-        // Retrieve the results
+        // Extract the aggregated results
         ParsedDateHistogram dateHistogram = searchResponse.getAggregations().get("by_date");
 
-        // Loop through the buckets and extract the values
-        Map<String, Map<String, Object>> results = new HashMap<>();
+        // Process each date bucket
         for (Histogram.Bucket bucket : dateHistogram.getBuckets()) {
             String date = bucket.getKeyAsString();
             ParsedStringTerms tags = bucket.getAggregations().get("by_tag");
 
+            // Process each tag bucket within the date bucket
             for (Terms.Bucket tagBucket : tags.getBuckets()) {
                 String tag = tagBucket.getKeyAsString();
                 Avg avgSentimentScore = tagBucket.getAggregations().get("avg_sentiment_score");
 
+                // Prepare the data to be indexed
                 Map<String, Object> data = new HashMap<>();
                 data.put("date", date);
                 data.put("tag", tag);
                 data.put("count", tagBucket.getDocCount());
                 data.put("avg_sentiment_score", avgSentimentScore.getValue());
 
-                // Store the results in a new index
-                IndexRequest indexRequest = new IndexRequest("tweet_metrics")
-                        .source(data);
+                // Index the results into the "tweet_metrics" index
+                IndexRequest indexRequest = new IndexRequest("tweet_metrics").source(data);
                 BulkRequest bulkRequest = new BulkRequest();
                 bulkRequest.add(indexRequest);
                 client.bulk(bulkRequest, RequestOptions.DEFAULT);
             }
         }
     }
+
 
 }
