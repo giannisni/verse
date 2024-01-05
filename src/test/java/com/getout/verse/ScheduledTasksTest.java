@@ -13,6 +13,6 @@ public class ScheduledTasksTest {
 
     @Test
     public void testScheduleKeywordCountTask() {
-        scheduledTasks.scheduleKeywordCountTask();
+        scheduledTasks.scheduleKeywordCountTask("cnn_articles_newone","cnn_articles_newone_counts");
     }
 }

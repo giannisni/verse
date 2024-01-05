@@ -38,7 +38,7 @@ public class IndexMap {
      * @throws IOException, InterruptedException, ExecutionException If there's an issue indexing the data.
      */
     @Autowired
-    public static void indexSortedMap(String indexName, Map<LocalDate, Integer> sortedMap, String keyword) throws IOException, InterruptedException, ExecutionException {
+    public static void indexSortedMap(String indexName, Map<LocalDate, Integer> sortedMap, String keyword,String fromIndex) throws IOException, InterruptedException, ExecutionException {
         // Initialize Elasticsearch RestClient
         RestClient restClient = RestClient.builder(new HttpHost("localhost", 9200)).build();
 
@@ -66,10 +66,13 @@ public class IndexMap {
                         .add("date", date.toString())
                         .add("value", value)
                         .add("keyword", keyword)
+                        .add("index",fromIndex)
                         .build();
 
                 Reader input = new StringReader(jsonObject.toString().replace('\'', '"'));
+                System.out.println(jsonObject);
 
+                System.out.println(input.toString());
                 // Create and execute the index request
                 IndexRequest<JsonData> request = IndexRequest.of(i -> i.index(indexName).withJson(input));
                 IndexResponse response = client.index(request);
@@ -82,7 +85,7 @@ public class IndexMap {
         for (Future<Void> future : futures) {
             future.get();
         }
-
+        System.out.println("Indexed index : " + indexName + " completed");
         // Cleanup resources
         executorService.shutdown();
         restClient.close();

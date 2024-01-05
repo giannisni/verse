@@ -36,6 +36,8 @@
 			<artifactId>commons-math3</artifactId>
 			<version>3.6.1</version>
 		</dependency>
+
+
 		<!-- https://mvnrepository.com/artifact/com.github.haifengl/smile-core -->
 		<dependency>
 			<groupId>com.github.haifengl</groupId>

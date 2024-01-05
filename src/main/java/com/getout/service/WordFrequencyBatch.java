@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Logger;
@@ -70,7 +71,11 @@ public class WordFrequencyBatch {
      * @return A sorted map with dates as keys and keyword frequencies as values.
      * @throws IOException, InterruptedException, ExecutionException
      */
-    public static Map<LocalDate, Integer> searchTopicFrequency(String indexName, String topic, List<String> keywords, int batchSize, String startDate, String endDate) throws IOException, InterruptedException, ExecutionException {
+
+
+
+
+    public static Map<LocalDate, Integer> searchTopicFrequency(String indexName,String toindex, String topic, List<String> keywords, int batchSize, String startDate, String endDate) throws IOException, InterruptedException, ExecutionException {
         long overallStartTime = System.currentTimeMillis();
 
         // Initialize Elasticsearch client
@@ -93,7 +98,7 @@ public class WordFrequencyBatch {
         // Build the search query
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
         for (String keyword : keywords) {
-            boolQuery.should(QueryBuilders.matchQuery("content", keyword));
+            boolQuery.should(QueryBuilders.matchQuery("text", keyword));
         }
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
                 .query(boolQuery
@@ -127,7 +132,7 @@ public class WordFrequencyBatch {
                     Object publishedDateObj = hit.getSourceAsMap().get("published_date");
                     LocalDate date = extractDate(publishedDateObj, formatter);
 
-                    String content = hit.getSourceAsMap().get("content").toString();
+                    String content = hit.getSourceAsMap().get("text").toString();
                     int frequency = countKeywordFrequency(content, keywords);
 
                     dateFrequencyMap.merge(date, frequency, Integer::sum);
@@ -162,7 +167,8 @@ public class WordFrequencyBatch {
         // Sort the map by date
         Map<LocalDate, Integer> sortedMap = new TreeMap<>(dateFrequencyMap);
 
-        indexSortedMap("daily_keyword_counts", sortedMap, topic);
+        System.out.print("Map " + sortedMap);
+        indexSortedMap(toindex, sortedMap, topic,indexName);
 
         long overallElapsedTimeMillis = System.currentTimeMillis() - overallStartTime;
         double overallElapsedTimeSec = overallElapsedTimeMillis / 1000.0;
@@ -200,11 +206,16 @@ public class WordFrequencyBatch {
      */
     private static int countKeywordFrequency(String content, List<String> keywords) {
         int frequency = 0;
+        String contentLower = content.toLowerCase(); // Convert content to lower case
+
         for (String keyword : keywords) {
-            frequency += (content.split(keyword, -1).length) - 1;
+            String keywordLower = keyword.toLowerCase(); // Convert keyword to lower case
+            frequency += (contentLower.split(keywordLower, -1).length) - 1;
         }
+
         return frequency;
     }
+
 
 
     /**
@@ -218,30 +229,37 @@ public class WordFrequencyBatch {
      * @return A sorted map with dates as keys and keyword frequencies as values.
      * @throws IOException, InterruptedException, ExecutionException
      */
-    public static Map<LocalDate, Integer> searchKeywordFrequency(String indexName, String keyword, int batchSize, String startDate, String endDate) throws IOException, InterruptedException, ExecutionException {
+    public static Map<LocalDate, Integer> searchKeywordFrequency(String indexName,String toindex, String keyword, int batchSize, String startDate, String endDate) throws IOException, InterruptedException, ExecutionException {
         long overallStartTime = System.currentTimeMillis();
 
         // Initialize Elasticsearch client
         RestHighLevelClient client = new RestHighLevelClient(
                 RestClient.builder(new HttpHost(elastic_host, 9200, "http")));
 
+        System.out.println("keyword : " + keyword);
         // Define date formatter for parsing dates from Elasticsearch
-        DateTimeFormatter formatter = new DateTimeFormatterBuilder()
+        DateTimeFormatter formatterWithZone = new DateTimeFormatterBuilder()
                 .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
                 .optionalStart()
-                .appendFraction(java.time.temporal.ChronoField.NANO_OF_SECOND, 1, 9, true)
+                .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
                 .optionalEnd()
-                .optionalStart()
-                .appendLiteral('Z')
-                .optionalEnd()
+                .appendOffset("+HH:MM", "Z")
                 .toFormatter();
+
+        DateTimeFormatter formatterWithoutZone = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+        DateTimeFormatter combinedFormatter = new DateTimeFormatterBuilder()
+                .appendOptional(formatterWithZone)
+                .appendOptional(formatterWithoutZone)
+                .toFormatter();
+
 
         Map<LocalDate, Integer> dateFrequencyMap = new ConcurrentHashMap<>();
 
         // Build the search query
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
                 .query(QueryBuilders.boolQuery()
-                        .must(QueryBuilders.matchQuery("content", keyword))
+                        .must(QueryBuilders.matchQuery("text", keyword))
                         .filter(QueryBuilders.existsQuery("published_date"))
                         .filter(QueryBuilders.rangeQuery("published_date").gte(startDate).lte(endDate)))
                 .size(batchSize);
@@ -255,7 +273,7 @@ public class WordFrequencyBatch {
         SearchHits hits = searchResponse.getHits();
         final long totalHits = hits.getTotalHits().value;
         SearchHit[] searchHits = hits.getHits();
-
+        System.out.println(searchHits);
         // Create a fixed thread pool for concurrent processing
         int numberOfThreads = 4;
         ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
@@ -270,11 +288,15 @@ public class WordFrequencyBatch {
                     logger.info("Total processed hits: " + currentProcessedHits + " / " + totalHits);
 
                     Object publishedDateObj = hit.getSourceAsMap().get("published_date");
-                    LocalDate date = extractDate(publishedDateObj, formatter);
+                    LocalDate date = extractDate(publishedDateObj, combinedFormatter);
 
-                    String content = hit.getSourceAsMap().get("content").toString();
+                    String content = hit.getSourceAsMap().get("text").toString();
+
+//                    System.out.println("Content: " + content);
                     List<String> keywordList = Collections.singletonList(keyword);
+                    System.out.println("KeywordList: " + keywordList);
                     int frequency = countKeywordFrequency(content, keywordList);
+                    System.out.println("Frequency: " + frequency);
 
                     dateFrequencyMap.merge(date, frequency, Integer::sum);
 
@@ -308,7 +330,7 @@ public class WordFrequencyBatch {
         // Sort the map by date
         Map<LocalDate, Integer> sortedMap = new TreeMap<>(dateFrequencyMap);
 
-        indexSortedMap("daily_keyword_counts", sortedMap, keyword);
+        indexSortedMap(toindex, sortedMap, keyword, indexName);
 
         long overallElapsedTimeMillis = System.currentTimeMillis() - overallStartTime;
         double overallElapsedTimeSec = overallElapsedTimeMillis / 1000.0;

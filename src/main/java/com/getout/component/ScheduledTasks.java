@@ -22,14 +22,14 @@ public class ScheduledTasks {
         this.wordFrequencyBatch = wordFrequencyBatch;
     }
 
-    @Scheduled(cron = "0 47 15 * * *")
-    public void scheduleKeywordCountTask() {
+//    @Scheduled(cron = "0 05 18 * * *")
+    public void  scheduleKeywordCountTask(String index,String toindex) {
         logger.info("Starting scheduled task for keyword count...");
 
         // Define the keywords you want to search for
         //List<String> keywords = Arrays.asList("Κωνσταντοπούλου","Μητσοτάκης", "Τσίπρας", "Βαρουφάκης", "Κουτσούμπας","Ανδρουλάκης","Kασιδιάρης","ΣΥΡΙΖΑ"," Hellenic Train","έγκλημα στα Τέμπη","τηλεδιοίκηση","Καραμανλής","φωτεινή σηματοδότηση","σιδηροδρομικό","ΤΡΑΙΝΟΣΕ","ΟΣΕ","τραγωδία στα Τέμπη","Σταθμάρχη","σύγκρουση των δύο τρένων","57 ανθρώπους","Ουκρανία","Νάτο","Πόλεμος στην Ουκρανία","Ρωσία","Πούτιν","Πλεύση Ελευθεριάς","Μέρα25","Δήμητρα","Δραχμή","Ευρώ","ευρώ");
         //List<String> keywords = Arrays.asList("Τέμπη");
-        List<String> keywords = Arrays.asList("Ανδρουλάκης","Kασιδιάρης","ΣΥΡΙΖΑ"," Hellenic Train","έγκλημα στα Τέμπη","τηλεδιοίκηση","Καραμανλής","φωτεινή σηματοδότηση","σιδηροδρομικό","ΤΡΑΙΝΟΣΕ","ΟΣΕ","τραγωδία στα Τέμπη","Σταθμάρχη","σύγκρουση των δύο τρένων","57 ανθρώπους","Ουκρανία","Νάτο","Πόλεμος στην Ουκρανία","Ρωσία","Πούτιν","Πλεύση Ελευθεριάς","Μέρα25","Δήμητρα","Δραχμή","Ευρώ","ευρώ");
+        List<String> keywords = Arrays.asList("israeli","israel","palestine","palestinian","palestinians","hamas", "israelis");
 
         //List<String> keywords = Arrays.asList("Μητσοτάκης", "Τσίπρας", "Βαρουφάκης", "Κουτσούμπας","Ανδρουλάκης","Kασιδιάρης","ΣΥΡΙΖΑ");
 
@@ -37,7 +37,7 @@ public class ScheduledTasks {
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
         LocalDateTime now = LocalDateTime.now();
         String endDate = now.format(formatter);
-        String startDate = now.minusDays(30).format(formatter);
+        String startDate = now.minusDays(100).format(formatter);
 
 
         System.out.println("Start date: " + startDate);
@@ -54,7 +54,7 @@ public class ScheduledTasks {
         for (String keyword : keywords) {
             Callable<Map<LocalDate, Integer>> task = () -> {
                 try {
-                    return wordFrequencyBatch.searchKeywordFrequency("norconex2", keyword, 500, startDate, endDate);
+                    return wordFrequencyBatch.searchKeywordFrequency(index,toindex, keyword, 500, startDate, endDate);
                 } catch (Exception e) {
                     logger.error("Error processing keyword: " + keyword, e);
                     return Collections.emptyMap();
@@ -112,7 +112,7 @@ public class ScheduledTasks {
 
             Callable<Map<LocalDate, Integer>> task = () -> {
                 try {
-                    return wordFrequencyBatch.searchTopicFrequency("norconex2", topic, keywords, 500, startDate, endDate);
+                    return wordFrequencyBatch.searchTopicFrequency("norconex2","norconex2_counts", topic, keywords, 500, startDate, endDate);
                 } catch (Exception e) {
                     logger.error("Error processing keywords for topic: " + topic, e);
                     return Collections.emptyMap();
