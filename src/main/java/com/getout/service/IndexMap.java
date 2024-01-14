@@ -40,7 +40,7 @@ public class IndexMap {
     @Autowired
     public static void indexSortedMap(String indexName, Map<LocalDate, Integer> sortedMap, String keyword,String fromIndex) throws IOException, InterruptedException, ExecutionException {
         // Initialize Elasticsearch RestClient
-        RestClient restClient = RestClient.builder(new HttpHost("localhost", 9200)).build();
+        RestClient restClient = RestClient.builder(new HttpHost("elastic_host", 9200)).build();
 
         // Create the transport with a Jackson mapper
         ElasticsearchTransport transport = new RestClientTransport(restClient, new JacksonJsonpMapper());

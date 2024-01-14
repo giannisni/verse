@@ -8,9 +8,13 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.SpanNearQueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +23,8 @@ import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.getout.util.Constants.elastic_host;
 
 @Service
 public class KeywordFrequencyService {
@@ -33,10 +39,11 @@ public class KeywordFrequencyService {
      * @throws IOException If there's an issue communicating with Elasticsearch.
      */
 
+    public String elasticHost = "localhost";
     public static Map<LocalDate, Integer> getKeywordCounts(String index,String keyword, LocalDate startDate, LocalDate endDate) throws IOException {
 
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost(elastic_host, 9200, "http")));
 
         //List<String> keywords = Arrays.asList("Μητσοτάκης", "Τσίπρας", "Βαρουφάκης", "Κουτσούμπας","Ανδρουλάκης","Kασιδιάρης","ΣΥΡΙΖΑ","Ουκρανία","Νάτο","Πόλεμος στην Ουκρανία","Ρωσία","Πούτιν");
 
@@ -115,7 +122,7 @@ public class KeywordFrequencyService {
 
     public List<OpenAIData> fetchOpenAIData(String indexName) throws IOException {
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http")));
 
         // Define the search query
         SearchRequest searchRequest = new SearchRequest(indexName);
@@ -177,7 +184,7 @@ public class KeywordFrequencyService {
 
     public static List<DocumentData> fetchDocumentsByTopic(LocalDate startDate, LocalDate endDate, int topicId, String index) throws IOException {
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http")));
 
         List<DocumentData> documents = new ArrayList<>();
 
@@ -211,7 +218,7 @@ public class KeywordFrequencyService {
 
     public static List<Map<String, Object>> getWordCloudData(String indexName) throws IOException {
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http")));
 
         SearchRequest searchRequest = new SearchRequest(indexName);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
@@ -241,7 +248,7 @@ public class KeywordFrequencyService {
 
     public static Map<String, Integer> fetchWordFrequenciesFromTopicNew(LocalDate startDate, LocalDate endDate) throws IOException {
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http")));
 
         Map<String, Integer> wordFrequencies = new HashMap<>();
 
@@ -319,7 +326,7 @@ public class KeywordFrequencyService {
 
     public static List<DocumentData> fetchDocumentsWithWords(LocalDate startDate, LocalDate endDate,List<String> keywords, String index) throws IOException {
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http")));
 
         List<DocumentData> documents = new ArrayList<>();
 
@@ -359,7 +366,7 @@ public class KeywordFrequencyService {
     // Modified Method to fetch keyword frequencies
     public static Map<String, Integer> fetchKeywordFrequencies(LocalDate startDate, LocalDate endDate) throws IOException {
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http")));
 
         Map<String, Integer> wordFrequencies = new HashMap<>();
 
@@ -433,6 +440,104 @@ public class KeywordFrequencyService {
         return correlation;
 
     }
+
+    public static Map<String, Float> fetchTermPercentages(
+            String term1, String term2, String term3, String term4,
+            String indexName, LocalDate startDate, LocalDate endDate) throws IOException {
+
+        RestHighLevelClient client = new RestHighLevelClient(
+                RestClient.builder(new HttpHost(elastic_host, 9200, "http"))
+        );
+
+        try {
+            long count1 = executeCountQuery(client, term1, term2, indexName, startDate, endDate);
+            long count2 = executeCountQuery(client, term3, term4, indexName, startDate, endDate);
+
+            long total = count1 + count2;
+            float percentage1 = (float) count1 / total;
+            float percentage2 = (float) count2 / total;
+
+            return Map.of(
+                    term1 + " " + term2, percentage1,
+                    term3 + " " + term4, percentage2
+            );
+
+        } finally {
+            client.close();
+        }
+    }
+
+    // Method to execute count query
+    private static long executeCountQuery(
+            RestHighLevelClient client, String term1, String term2,
+            String indexName, LocalDate startDate, LocalDate endDate) throws IOException {
+
+        SpanNearQueryBuilder spanNearQuery = QueryBuilders.spanNearQuery(
+                        QueryBuilders.spanTermQuery("text", term1), 50
+                ).inOrder(false)
+                .addClause(QueryBuilders.spanTermQuery("text", term2));
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(spanNearQuery);
+        searchSourceBuilder.size(0);
+
+        SearchRequest searchRequest = new SearchRequest(indexName);
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+
+        return searchResponse.getHits().getTotalHits().value;
+    }
+
+    // Method to execute highlights query
+    public static Map<String, List<String>> fetchHighlights(
+            String term1, String term2, String indexName,
+            LocalDate startDate, LocalDate endDate) throws IOException {
+
+        RestHighLevelClient client = new RestHighLevelClient(
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http"))
+        );
+
+        try {
+            SpanNearQueryBuilder spanNearQuery = QueryBuilders.spanNearQuery(
+                            QueryBuilders.spanTermQuery("text", term1), 50
+                    ).inOrder(false)
+                    .addClause(QueryBuilders.spanTermQuery("text", term2));
+
+            SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+            searchSourceBuilder.query(spanNearQuery);
+
+            HighlightBuilder highlightBuilder = new HighlightBuilder();
+            HighlightBuilder.Field highlightText = new HighlightBuilder.Field("text");
+            highlightBuilder.field(highlightText);
+            searchSourceBuilder.highlighter(highlightBuilder);
+            searchSourceBuilder.size(10);
+
+            SearchRequest searchRequest = new SearchRequest(indexName);
+            searchRequest.source(searchSourceBuilder);
+
+            SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+
+            Map<String, List<String>> highlights = new HashMap<>();
+            for (SearchHit hit : searchResponse.getHits().getHits()) {
+                String documentId = hit.getId();
+                HighlightField highlightField = hit.getHighlightFields().get("text");
+                if (highlightField != null) {
+                    List<String> highlightSnippets = new ArrayList<>();
+                    for (var fragment : highlightField.fragments()) {
+                        highlightSnippets.add(fragment.string());
+                    }
+                    highlights.put(documentId, highlightSnippets);
+                }
+            }
+
+            return highlights;
+
+        } finally {
+            client.close();
+        }
+    }
+
 
 
     /**
@@ -516,6 +621,50 @@ public class KeywordFrequencyService {
         map.forEach((k, v) -> sb.append(k.toString()).append(",").append(v).append("\n"));
         return sb.toString();
     }
+
+    public static Map<String, Float> fetchKeywordPercentages(
+            String keyword1, String keyword2, String indexName) throws IOException {
+
+        RestHighLevelClient client = new RestHighLevelClient(
+                RestClient.builder(new HttpHost("elastic_host", 9200, "http"))
+        );
+
+        try {
+            long count1 = executeCountQuery(client, keyword1, indexName);
+            long count2 = executeCountQuery(client, keyword2, indexName);
+
+            long total = count1 + count2;
+            float percentage1 = total == 0 ? 0 : (float) count1 / total;
+            float percentage2 = total == 0 ? 0 : (float) count2 / total;
+
+            return Map.of(
+                    keyword1, percentage1,
+                    keyword2, percentage2
+            );
+
+        } finally {
+            client.close();
+        }
+    }
+
+    // Method to execute count query for a specific keyword
+    private static long executeCountQuery(
+            RestHighLevelClient client, String keyword, String indexName) throws IOException {
+
+        MatchQueryBuilder matchQuery = QueryBuilders.matchQuery("text", keyword);
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(matchQuery);
+        searchSourceBuilder.size(0);
+
+        SearchRequest searchRequest = new SearchRequest(indexName);
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+
+        return searchResponse.getHits().getTotalHits().value;
+    }
+
 
 
 

@@ -1,0 +1,7 @@
+version: '3.8'
+
+services:
+  myapp:
+    build: .
+    ports:
+      - "8080:8080"  # Maps port 8080 of the container to port 8080 on the host

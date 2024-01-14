@@ -17,13 +17,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
-import static com.getout.service.KeywordFrequencyService.fetchKeywordFrequencies;
-import static com.getout.service.KeywordFrequencyService.fetchWordFrequenciesFromTopicNew;
+import static com.getout.service.KeywordFrequencyService.*;
 
 @RestController
 @RequestMapping("/api/news")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "*")
 public class WordFrequencyController {
     @Autowired
     private KeywordFrequencyService keywordFrequencyService; // Inject the service
@@ -81,6 +81,16 @@ public class WordFrequencyController {
     }
 
 
+    @GetMapping("/highlights")
+    public Map<String, List<String>> getHighlights(
+            @RequestParam String term1,
+            @RequestParam String term2,
+            @RequestParam String indexName,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) throws IOException {
+
+        return fetchHighlights(term1, term2, indexName, startDate, endDate);
+    }
     @GetMapping("/keyword-frequencies")
     public Map<String, Integer> getKeywordFrequencies(
             @RequestParam String startDate,
@@ -161,7 +171,48 @@ public class WordFrequencyController {
         }
     }
 
-//    @GetMapping("/forecast")
+    @GetMapping("/term-percentages")
+    public ResponseEntity<Map<String, Float>> getTermPercentages(
+            @RequestParam String term1,
+            @RequestParam String term2,
+            @RequestParam String term3,
+            @RequestParam String term4,
+            @RequestParam String indexName,
+            @RequestParam  String startDate,
+            @RequestParam  String endDate) {
+
+        try {
+            LocalDate start = LocalDate.parse(startDate);
+            LocalDate end = LocalDate.parse(endDate);
+            Map<String, Float> percentages =fetchTermPercentages(
+                    term1, term2, term3, term4, indexName, start, end);
+            return ResponseEntity.ok(percentages);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/keyword-percentages")
+    public Map<String, Object> getKeywordPercentages(
+            @RequestParam String keyword1,
+            @RequestParam String keyword2,
+            @RequestParam String indexName) {
+
+        try {
+            return fetchKeywordPercentages(keyword1, keyword2, indexName)
+                    .entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> (Object) entry.getValue()));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return Map.of("error", "An error occurred while fetching keyword percentages");
+        }
+    }
+
+
+
+    //    @GetMapping("/forecast")
 //    public ResponseEntity<Double> getForecast(
 //            @RequestParam String keyword1,
 //            @RequestParam String keyword2,
